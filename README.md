@@ -18,6 +18,7 @@ Here's the simplest sample of TBaseWizard descendant.
 
 ... set BW_* defines in project options if needed ...
 
+```pascal
 type
   TWizard = class(TBaseWizard)
   public
@@ -71,3 +72,4 @@ initialization
   BaseWiz.SWizardMenuItem := '...';
   BaseWiz.CreateInstFunc := CreateInstFunc;
 end.
+```
