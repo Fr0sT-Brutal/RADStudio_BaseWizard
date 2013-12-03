@@ -28,6 +28,7 @@ type
     function CheckReady: Boolean; override;
     procedure Startup; override;
     procedure Execute; override;
+    procedure Cleanup; override;
   end;
 
 implementation
@@ -46,7 +47,7 @@ constructor TWizard.Create;
 begin
   inherited Create([optUseConfig, optUseDelayed]); // set desired options
 
-  // read options later, on Startup
+  // we'll read options later, on Startup
 end;
 
 destructor TWizard.Destroy;
@@ -64,6 +65,11 @@ end;
 procedure TWizard.Startup;
 begin
   ... read options using FConfigKey property ...
+end;
+
+procedure TWizard.Cleanup;
+begin
+  ... saving, closing, freeing, etc ...
 end;
 
 initialization

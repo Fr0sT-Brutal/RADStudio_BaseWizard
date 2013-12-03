@@ -33,11 +33,14 @@ type
   TBaseWizard = class(TNotifierObject, IOTAWizard {$IFDEF BW_UseMenuItem}, IOTAMenuWizard{$ENDIF})
   private
     procedure TimerTimer(Sender: TObject);
+    procedure DoCleanup;
   protected
     FOptions: TWizardOptions; // Options that could be set by descendants to control base behaviour
     FConfigKey: TRegistry;    // config storage
+    FWasCleanup: Boolean;     // flag showing that DoCleanup was executed
   public
     constructor Create(Options: TWizardOptions);
+    // Destructor seem to never be called! But implement it anyway
     destructor Destroy; override;
     // Launched periodically by timer to check if RAD is loaded completely
     function CheckReady: Boolean; virtual; abstract;
@@ -45,10 +48,11 @@ type
     procedure Startup; virtual; abstract;
     // For debug
     procedure Log(const msg: string);
-    {$IFDEF BW_UseMenuItem}
     // Method is called when a user clicks the wizard's menu item in Help menu
     procedure Execute; virtual; abstract;
-    {$ENDIF}
+    // Method is called when the wizard is about to be freed. You must implement
+    // all the closes/frees/etc here because destructor is NEVER called for the wizard!
+    procedure Cleanup; virtual;
 
     // IOTAWizard interface methods(required for all wizards/experts)
     function GetIDString: string;
@@ -101,8 +105,9 @@ exports
 
 implementation
 
-{$IFDEF BW_UseForms}
 var
+  Wizard: TBaseWizard;  // keep the created instance to be able to launch cleanup
+{$IFDEF BW_UseForms}
   OldAppHandle: THandle;
 {$ENDIF}
 
@@ -126,12 +131,22 @@ begin
   {$ENDIF}
 end;
 
+procedure DoneWizard;
+begin
+  if Wizard <> nil then
+    try Wizard.DoCleanup; except end;
+end;
+
 {$IFDEF BW_Pack}
 procedure Register;
+var
+  TmpWiz: TBaseWizard;
 begin
   try
     InitGlobals;
-    RegisterPackageWizard(CreateInstFunc as IOTAWizard);
+    TmpWiz := CreateInstFunc;
+    RegisterPackageWizard(TmpWiz);
+    Wizard := TmpWiz;
   except on E: Exception do
     MessageBox(0, PChar(Format(SMsgErrorRegistering, [SWizardName, E.Message])), nil, MB_OK and MB_ICONERROR);
   end;
@@ -162,7 +177,7 @@ var
   Timer: TTimer;
 begin
   {$IFDEF DEBUG}
-  Log('Create');
+  Log('TBaseWizard.Create');
   {$ENDIF}
   inherited Create;
   FOptions := Options;
@@ -189,15 +204,28 @@ begin
     Startup;
 end;
 
+procedure TBaseWizard.Cleanup;
+begin
+end;
+
 destructor TBaseWizard.Destroy;
 begin
   {$IFDEF DEBUG}
-  Log('Destroy');
+  Log('TBaseWizard.Destroy');
   {$ENDIF}
+  DoCleanup;
+  inherited;
+end;
 
+procedure TBaseWizard.DoCleanup;
+begin
+  if FWasCleanup then Exit;
+  Cleanup;
+  {$IFDEF DEBUG}
+  Log('TBaseWizard.DoCleanup');
+  {$ENDIF}
   if optUseConfig in FOptions then
     FreeAndNil(FConfigKey);
-  inherited;
 end;
 
 procedure TBaseWizard.Log(const msg: string);
@@ -269,4 +297,5 @@ finalization
   {$IFDEF BW_UseForms}
   Application.Handle := OldAppHandle;
   {$ENDIF}
+  DoneWizard;
 end.
