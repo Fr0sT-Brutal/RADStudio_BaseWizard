@@ -63,9 +63,20 @@ type
     {$ENDIF}
   end;
 
-  // Unit needs to create an instance of desired class but it couldn't know about it
-  // so the descendants must provide a callback
+  // Unit needs to create an instance of desired class but it couldn't know about
+  // this class so the descendants must provide a callback
   TCreateInstFunc = function: TBaseWizard;
+
+{$IFDEF BW_Pack}
+procedure Register;
+{$ENDIF}
+{$IFDEF BW_Lib}
+function InitWizard(const ABorlandIDEServices : IBorlandIDEServices;
+                    RegisterProc : TWizardRegisterProc;
+                    var Terminate: TWizardTerminateProc) : Boolean; stdcall;
+exports
+  InitWizard name WizardEntryPoint;
+{$ENDIF}
 
 // base wizard props, must be inited!
 var
@@ -90,18 +101,6 @@ resourcestring
   SMsgErrorRegistering = 'Error registering expert %s.'#13#10'%s';
 
   SConfigBasePath = '\Experts\'; // config path in registry is %BDS_base%\%SConfigBasePath%\%SWizardID%
-
-{$IFDEF BW_Pack}
-procedure Register;
-{$ENDIF}
-{$IFDEF BW_Lib}
-function InitWizard(const ABorlandIDEServices : IBorlandIDEServices;
-                    RegisterProc : TWizardRegisterProc;
-                    var Terminate: TWizardTerminateProc) : Boolean; stdcall;
-
-exports
-  InitWizard name WizardEntryPoint;
-{$ENDIF}
 
 implementation
 
@@ -131,25 +130,31 @@ begin
   {$ENDIF}
 end;
 
-procedure DoneWizard;
+// create and init wizard object
+function InitWizard(RegisterProc: TWizardRegisterProc): Boolean;
+var
+  TmpWiz: TBaseWizard;
 begin
-  if Wizard <> nil then
-    try Wizard.DoCleanup; except end;
+  Result := False;
+  try
+    InitGlobals;
+    TmpWiz := CreateInstFunc;
+    {$IFDEF BW_Pack}
+    RegisterProc := @RegisterPackageWizard;
+    {$ENDIF}
+    RegisterProc(TmpWiz);
+    Wizard := TmpWiz;
+    Result := True;
+  except on E: Exception do
+    MessageBox({$IFDEF BW_UseForms}Application.Handle{$ELSE}0{$ENDIF},
+               PChar(Format(SMsgErrorRegistering, [SWizardName, E.Message])), PChar(SWizardName), MB_OK and MB_ICONERROR);
+  end;
 end;
 
 {$IFDEF BW_Pack}
 procedure Register;
-var
-  TmpWiz: TBaseWizard;
 begin
-  try
-    InitGlobals;
-    TmpWiz := CreateInstFunc;
-    RegisterPackageWizard(TmpWiz);
-    Wizard := TmpWiz;
-  except on E: Exception do
-    MessageBox(0, PChar(Format(SMsgErrorRegistering, [SWizardName, E.Message])), nil, MB_OK and MB_ICONERROR);
-  end;
+  InitWizard(nil);
 end;
 {$ENDIF}
 
@@ -158,17 +163,17 @@ function InitWizard(const ABorlandIDEServices : IBorlandIDEServices;
                     RegisterProc : TWizardRegisterProc;
                     var Terminate: TWizardTerminateProc) : Boolean;
 begin
-  Result := False;
   BorlandIDEServices := ABorlandIDEServices;
-  try
-    InitGlobals;
-    RegisterProc(CreateInstFunc as IOTAWizard);
-    Result := True;
-  except on E: Exception do
-    Log(Format(SMsgErrorRegistering, [SWizardName, ExceptionInfo(E)]));
-  end;
+  Result := InitWizard;
 end;
 {$ENDIF}
+
+// prepare wizard object for destruction
+procedure DoneWizard;
+begin
+  if Wizard <> nil then
+    try Wizard.DoCleanup; except end;
+end;
 
 {$REGION 'TBaseWizard'}
 
