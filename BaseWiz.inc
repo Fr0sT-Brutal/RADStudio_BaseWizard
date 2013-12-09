@@ -13,7 +13,8 @@
   © Fr0sT
 *******************************************************************************)
 
-unit BaseWiz;
+//unit BaseWiz; ! Due to package compiling limitations, two packages may not use
+//                the same unit. So you'll have to use include-hack (see README)
 
 interface
 
