@@ -14,7 +14,7 @@ Features:
 Usage principles:
 ----------------
 * At first, add `$(BDS)\source\ToolsAPI` to library and browsing path (Tools > Options > Delphi options > Library path, Browsing path)
-* Due to package compiling limitations, two packages may not use a unit with the same name (see section *Package compiling tricks* below). So you'll have to use "include hack": create unit `%YourWizardFolder%\%YourWizardName%_BaseWiz.pas` with the following contents:
+* Due to package compiling limitations, two packages may not use a unit with the same name (see section **Package compiling tricks** below). So you'll have to use "include hack": create unit `%YourWizardFolder%\%YourWizardName%_BaseWiz.pas` with the following contents:
 
 
 ```pascal
@@ -31,15 +31,20 @@ and use it as usual. Consider adding the path to BaseWizard folder to your proje
 Package compiling tricks:
 ------------------------
 When building packages or libraries with `Build with runtime packages` option turned on, RAD studio forbids simple usage of units with the same name. If you get an error
+
 `Cannot load package 'X'.
 It contains unit 'Y', which is also contained in package 'Z'`
+
 you've got the point.
 There are two ways of dealing with the issue:
+
 1. Separate all the used units into package and add it to require list. This is good option for utility units.
 2. Rename the units that caused the conflict. That's what we got to do with wizards.
 Probably you have already used this way with "include hack". It is quite tricky but it's the most simple way of using base class for wizards. Luckily you won't have to do that kind of stuff with another units.
-*All you've got to do is name all the units of your wizard in unique way.*
-Of course, there are many flavors to do it but I advice using "namespaces" just like RAD Studio does (System.SysUtils, Vcl.Forms, ...). So if your wizard is, say, a tetris integrated into IDE, use prefix TetWiz for all the used units: TetWiz.MainWiz, TetWiz.FormSettings, TetWiz.FormMain, etc. Thus you'll create fully autonomous package which won't conflict with another one (maybe yours too!), even if it would have MainWiz and FormSettings units as well.
+
+**All you've got to do is name all the units of your wizard in unique way.**
+
+Of course, there are many flavors to do it but I advice using "namespaces" just like RAD Studio does (System.SysUtils, Vcl.Forms, ...). So if your wizard is, say, a tetris integrated into IDE, use prefix `TetWiz` for all the used units: `TetWiz.MainWiz`, `TetWiz.FormSettings`, `TetWiz.FormMain`, etc. Thus you'll create fully autonomous package which won't conflict with another one (maybe yours too!), even if it would have `MainWiz` and `FormSettings` units as well.
 
 Sample:
 ------
