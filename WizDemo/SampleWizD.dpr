@@ -3,7 +3,7 @@ library SampleWizD;
 {$R *.res}
 
 uses
-  SampleWiz in 'SampleWiz.pas';
+  SampleWiz.Main in 'SampleWiz.Main.pas';
 
 begin
 end.

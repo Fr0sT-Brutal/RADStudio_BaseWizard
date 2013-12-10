@@ -3,10 +3,13 @@
     Config via registry, delayed init, forms support
   Defines:
     BW_Pack - the project is BPL package
+      or
     BW_Lib  - the project is DLL expert
     BW_UseForms - support forms (there's some trick with forms from DLL/BPL)
     BW_UseMenuItem - an item with caption = SWizardMenuItem will be added to
-      Help menu. Pressing it will launch wizard's Execute method.
+      Help menu. Pressing it will launch wizard's Execute method. This is not
+      adjustable, if you want custom placement in menu, you should add it via
+      INSrv.MainMenu
   Usage:
     See README and demo project
 
@@ -50,6 +53,7 @@ type
     // For debug
     procedure Log(const msg: string);
     // Method is called when a user clicks the wizard's menu item in Help menu
+    // Don't try to comment it out - it is contained in IOTAWizard
     procedure Execute; virtual; abstract;
     // Method is called when the wizard is about to be freed. You must implement
     // all the closes/frees/etc here because destructor is NEVER called for the wizard!
@@ -101,7 +105,7 @@ resourcestring
   SMsgRegKeyFail = 'Cannot open/create registry key ';
   SMsgErrorRegistering = 'Error registering expert %s.'#13#10'%s';
 
-  SConfigBasePath = '\Experts\'; // config path in registry is %BDS_base%\%SConfigBasePath%\%SWizardID%
+  SConfigBasePath = '\'+isWizards+'\'; // config path in registry is %BDS_base%\%SConfigBasePath%\%SWizardID%
 
 implementation
 
@@ -132,7 +136,7 @@ begin
 end;
 
 // create and init wizard object
-function InitWizard(RegisterProc: TWizardRegisterProc): Boolean;
+function InitWiz(RegisterProc: TWizardRegisterProc): Boolean;
 var
   TmpWiz: TBaseWizard;
 begin
@@ -152,10 +156,17 @@ begin
   end;
 end;
 
+// prepare wizard object for destruction
+procedure DoneWiz;
+begin
+  if Wizard <> nil then
+    try Wizard.DoCleanup; except end;
+end;
+
 {$IFDEF BW_Pack}
 procedure Register;
 begin
-  InitWizard(nil);
+  InitWiz(nil);
 end;
 {$ENDIF}
 
@@ -165,16 +176,9 @@ function InitWizard(const ABorlandIDEServices : IBorlandIDEServices;
                     var Terminate: TWizardTerminateProc) : Boolean;
 begin
   BorlandIDEServices := ABorlandIDEServices;
-  Result := InitWizard;
+  Result := InitWiz(RegisterProc);
 end;
 {$ENDIF}
-
-// prepare wizard object for destruction
-procedure DoneWizard;
-begin
-  if Wizard <> nil then
-    try Wizard.DoCleanup; except end;
-end;
 
 {$REGION 'TBaseWizard'}
 
@@ -303,5 +307,5 @@ finalization
   {$IFDEF BW_UseForms}
   Application.Handle := OldAppHandle;
   {$ENDIF}
-  DoneWizard;
+  DoneWiz;
 end.
