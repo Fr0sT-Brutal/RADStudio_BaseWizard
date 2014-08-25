@@ -35,13 +35,17 @@ type
 
   // TNotifierObject has stub implementations for the necessary but unused IOTANotifer methods
   TBaseWizard = class(TNotifierObject, IOTAWizard {$IFDEF BW_UseMenuItem}, IOTAMenuWizard{$ENDIF})
-  private
-    procedure TimerTimer(Sender: TObject);
-    procedure DoCleanup;
-  protected
-    FOptions: TWizardOptions; // Options that could be set by descendants to control base behaviour
+  strict private
     FConfigKey: TRegistry;    // config storage
     FWasCleanup: Boolean;     // flag showing that DoCleanup was executed
+    FStarted: Boolean;        // flag showing that Startup was executed
+    procedure TimerTimer(Sender: TObject);
+  private // used in DoneWiz proc
+    procedure DoCleanup;
+  protected
+    property ConfigKey: TRegistry read FConfigKey;
+    property WasCleanup: Boolean  read FWasCleanup;
+    property Started: Boolean     read FStarted;
   public
     constructor Create(Options: TWizardOptions);
     // Destructor seem to never be called! But implement it anyway
@@ -190,10 +194,9 @@ begin
   Log('TBaseWizard.Create');
   {$ENDIF}
   inherited Create;
-  FOptions := Options;
 
   // init config
-  if optUseConfig in FOptions then
+  if optUseConfig in Options then
   begin
     FConfigKey := TRegistry.Create(KEY_ALL_ACCESS);
     FConfigKey.RootKey := HKEY_CURRENT_USER;
@@ -202,7 +205,7 @@ begin
   end;
 
   // start timer
-  if optUseDelayed in FOptions then
+  if optUseDelayed in Options then
   begin
     // timer to wait for IDE to load completely
     Timer := TTimer.Create(nil);
@@ -211,7 +214,10 @@ begin
     Timer.Enabled := True;
   end
   else
+  begin
     Startup;
+    FStarted := True;
+  end;
 end;
 
 procedure TBaseWizard.Cleanup;
@@ -224,6 +230,7 @@ begin
   Log('TBaseWizard.Destroy');
   {$ENDIF}
   DoCleanup;
+  FreeAndNil(FConfigKey);
   inherited;
 end;
 
@@ -234,8 +241,6 @@ begin
   {$IFDEF DEBUG}
   Log('TBaseWizard.DoCleanup');
   {$ENDIF}
-  if optUseConfig in FOptions then
-    FreeAndNil(FConfigKey);
 end;
 
 procedure TBaseWizard.Log(const msg: string);
@@ -246,6 +251,7 @@ var
 begin
   Inst := IntToHex(NativeUInt(Self), 1);
   OutputDebugString(PChar(SWizardName + '.' + Inst + ' ' + msg));
+  {$IFDEF DEBUG}
   Res := GetTempPath(0, nil);
   if Res = 0 then Exit;
   SetLength(TmpPath, Res);
@@ -262,6 +268,7 @@ begin
   {$I+}
   Writeln(Logfile, DateTimeToStr(Now)+#9+Inst+#9+msg);
   CloseFile(Logfile);
+  {$ENDIF}
 end;
 
 // ! this timer waits for IDE to load completely (i.e., when main menu is created,
@@ -272,6 +279,7 @@ begin
   begin
     Sender.Free;  // switch the timer off
     Startup;      // launch
+    FStarted := True;
   end;
 end;
 
