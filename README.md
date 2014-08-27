@@ -1,20 +1,22 @@
 Base expert/wizard class for RAD studio
 =======================================
 
-Features:
+Features
 --------
-* Supports both BPL and DLL projects
-* Initializes several basic RAD studio interfaces
-* Log output to file `%TEMP%\%wizardname%.log` and standard debug channel (view messages in Message tool window in RAD studio or DbgView application)
-* Optional config via registry (by default path is `HKCU\Software\Embarcadero\BDS\%BDSver%\Experts\%SWizardID%`)
-* Optional delayed init - give RAD studio some time to startup
+
+* Supports both BPL and DLL projects (**DLL not tested yet**)
+* Initializes several basic RAD Studio interfaces
+* Logs output to file `%TEMP%\%wizardname%.log` (in DEBUG configuration) and standard debug channel (view messages in RAD Studio's Message tool window or with DbgView application)
+* Optional config via registry (default path is `HKCU\Software\Embarcadero\BDS\%BDSver%\Experts\%SWizardID%`)
+* Optional delayed init - gives RAD Studio some time to startup
 * Optional forms support
 * Optional menu item support (item will be placed inside `Help` menu)
 
-Usage principles:
+Usage principles
 ----------------
-* At first, add `$(BDS)\source\ToolsAPI` to library and browsing path (Tools > Options > Delphi options > Library path, Browsing path)
-* Due to package compiling limitations, two packages may not use a unit with the same name (see section **Package compiling tricks** below). So you'll have to use "include hack": create unit `%YourWizardFolder%\%YourWizardName%_BaseWiz.pas` with the following contents:
+
+* At first, add `$(BDS)\source\ToolsAPI` to library and browsing path (`Tools > Options > Delphi options > Library path`, Browsing path)
+* Due to package compiling limitations, two packages may not use a unit with the same name (see [Package compiling tricks](#package-compiling-tricks) section below). So you'll have to use "include hack": create unit `%YourWizardFolder%\%YourWizardName%.BaseWiz.pas` with the following contents:
 
 
 ```pascal
@@ -23,14 +25,15 @@ Usage principles:
 ```
 
 
-and use it as usual. Consider adding the path to BaseWizard folder to your project's search path (Project > Options... > Delphi compiler > Search path).
-* Next you'll have to add a define of your project type: package/library (Project > Options... > Delphi compiler > Conditional defines). These are `BW_Pack` or `BW_Lib`. Don't try to define both - this could lead to collapse of the Universe :).
-* Then you'll have to inherit your own wizard class from `TBaseWizard`, implement `function  CreateInstFunc: TBaseWizard` that would return a new instance of your wizard class and assign `%YourWizardName%_BaseWiz` unit's `SWizard*` and `CreateInstFunc` variables inside initialization section.
+and use it as usual. Consider adding the path to BaseWizard folder to your project's search path (`Project > Options... > Delphi compiler > Search path`).
+* Next you'll have to add a define of your project type: package/library (`Project > Options... > Delphi compiler > Conditional defines`). These are `BW_Pack` or `BW_Lib`. Don't try to define both - this could lead to collapse of the Universe :).
+* Then you'll have to inherit your own wizard class from `TBaseWizard`, implement `function  CreateInstFunc: TBaseWizard` that would return a new instance of your wizard class and assign `%YourWizardName%.BaseWiz.pas` unit's `SWizard*` and `CreateInstFunc` variables inside initialization section.
 * Please read the next section regarding package compiling limitations.
 
-Package compiling tricks:
+Package compiling tricks
 ------------------------
-When building packages or libraries with `Build with runtime packages` option turned on, RAD studio forbids simple usage of units with the same name. If you get an error
+
+When building packages or libraries with `Build with runtime packages` option turned on, RAD Studio forbids usage of units with the same name. If you get an error
 
 `Cannot load package 'X'.
 It contains unit 'Y', which is also contained in package 'Z'`
@@ -38,16 +41,17 @@ It contains unit 'Y', which is also contained in package 'Z'`
 you've got the point.
 There are two ways of dealing with the issue:
 
-1. Separate all the used units into package and add it to require list. This is good option for utility units.
+1. Separate all the used units into package and add it to require list. This is good option for utility units but you'll have to provide that package along with your wizard.
 2. Rename the units that caused the conflict. That's what we got to do with wizards.
-Probably you have already used this way with "include hack". It is quite tricky but it's the most simple way of using base class for wizards. Luckily you won't have to do that kind of stuff with another units.
+Probably you have already used this way with "include hack". It is quite tricky but it's the most simple way of using one base class for wizards. Luckily you won't have to do that kind of stuff with another units.
 
 **All you've got to do is name all the units of your wizard in unique way.**
 
-Of course, there are many flavors to do it but I advice using "namespaces" just like RAD Studio does (System.SysUtils, Vcl.Forms, ...). So if your wizard is, say, a tetris integrated into IDE, use prefix `TetWiz` for all the used units: `TetWiz.MainWiz`, `TetWiz.FormSettings`, `TetWiz.FormMain`, etc. Thus you'll create fully autonomous package which won't conflict with another one (maybe yours too!), even if it would have `MainWiz` and `FormSettings` units as well.
+Of course, there are many flavors to do it but I advice using "namespaces" just like RAD Studio does (`System.SysUtils`, `Vcl.Forms` etc). So if your wizard is, say, a tetris integrated into IDE, use prefix `TetWiz` for all the used units: `TetWiz.MainWiz`, `TetWiz.FormSettings`, `TetWiz.FormMain` etc. Thus you'll create a completely autonomous package which won't conflict with another one (maybe yours too!), even if it would have `MainWiz` and `FormSettings` units as well.
 
-Sample:
+Sample
 ------
+
 Here's the simplest sample of TBaseWizard descendant.
 
 ```pascal
@@ -95,14 +99,14 @@ end;
 
 procedure TWizard.Startup;
 begin
-  ... read options using FConfigKey property ...
+  ... read options using ConfigKey property ...
 end;
 
 procedure TWizard.Cleanup;
 begin
   ... saving, closing, freeing, etc ...
 
-  ... write options using FConfigKey property ...
+  ... write options using ConfigKey property ...
 end;
 
 initialization
