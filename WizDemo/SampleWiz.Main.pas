@@ -66,7 +66,7 @@ procedure TWizard.Startup;
 begin
   // *** read options ***
 
-  FPersonName := FConfigKey.ReadString(SRegKeyName);
+  FPersonName := ConfigKey.ReadString(SRegKeyName);
 end;
 
 procedure TWizard.Execute;
@@ -78,7 +78,7 @@ procedure TWizard.Cleanup;
 begin
   // ** write options **
 
-  FConfigKey.WriteString(SRegKeyName, FPersonName);
+  ConfigKey.WriteString(SRegKeyName, FPersonName);
 end;
 
 {$ENDREGION}
