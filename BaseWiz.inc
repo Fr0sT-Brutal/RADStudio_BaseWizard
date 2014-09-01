@@ -6,7 +6,7 @@
       or
     BW_Lib  - the project is DLL expert
     BW_UseForms - support forms (there's some trick with forms from DLL/BPL)
-    BW_UseMenuItem - an item with caption = SWizardMenuItem will be added to
+    BW_UseMenuItem - an item with caption %SWizardMenuItem% will be added to
       Help menu. Pressing it will launch wizard's Execute method. This is not
       adjustable, if you want custom placement in menu, you should add it via
       INSrv.MainMenu
@@ -36,32 +36,43 @@ type
   // TNotifierObject has stub implementations for the necessary but unused IOTANotifer methods
   TBaseWizard = class(TNotifierObject, IOTAWizard {$IFDEF BW_UseMenuItem}, IOTAMenuWizard{$ENDIF})
   strict private
+    FTimer: TTimer;
     FConfigKey: TRegistry;    // config storage
+    FWasStartup: Boolean;     // flag showing that DoStartup was executed
     FWasCleanup: Boolean;     // flag showing that DoCleanup was executed
-    FStarted: Boolean;        // flag showing that Startup was executed
     procedure TimerTimer(Sender: TObject);
   private // used in DoneWiz proc
+    procedure DoStartup;
     procedure DoCleanup;
   protected
     property ConfigKey: TRegistry read FConfigKey;
     property WasCleanup: Boolean  read FWasCleanup;
-    property Started: Boolean     read FStarted;
+    property WasStartup: Boolean  read FWasStartup;
   public
+    // Constructor is mainly used for defining wizard options in descendants
+    // but fits for creating stuff too. Keep in mind that stuff you create here
+    // could bypass freeing in destructor (see below).
+    // NEVER try to create stuff here that will be freed in Cleanup!
     constructor Create(Options: TWizardOptions);
-    // Destructor seem to never be called! But implement it anyway
+    // Destructor seem to seldom be called! Place non-critical freeings here.
+    // All valuable actions (setting saving etc) must be performed in Cleanup.
+    // Freeing of custom stuff in descendants SHOULD be performed AFTER calling
+    // inherited destructor as it calls Cleanup before actual freeing.
     destructor Destroy; override;
     // Launched periodically by timer to check if RAD is loaded completely
     function CheckReady: Boolean; virtual; abstract;
-    // First Wizard launch
+    // First Wizard launch. Place all the create/init things here.
+    // Startup/Cleanup pair could be executed ANY NUMBER of times during a single
+    // IDE run time so be warned.
     procedure Startup; virtual; abstract;
-    // For debug
-    procedure Log(const msg: string);
+    // Method is called when the wizard is about to be freed. You must implement
+    // all main closes/frees/etc here because destructor is seldom called for the wizard!
+    procedure Cleanup; virtual; abstract;
     // Method is called when a user clicks the wizard's menu item in Help menu
     // Don't try to comment it out - it is contained in IOTAWizard
     procedure Execute; virtual; abstract;
-    // Method is called when the wizard is about to be freed. You must implement
-    // all the closes/frees/etc here because destructor is NEVER called for the wizard!
-    procedure Cleanup; virtual;
+    // For debug
+    procedure Log(const msg: string);
 
     // IOTAWizard interface methods(required for all wizards/experts)
     function GetIDString: string;
@@ -90,10 +101,14 @@ exports
 // base wizard props, must be inited!
 var
   {$IFDEF BW_UseMenuItem}
+  // Name for wizard's menu item in Help menu. Keep it empty to skip item addition.
   SWizardMenuItem,
   {$ENDIF}
+  // Short wizard name. Used mainly internally and for log file name
   SWizardName,
+  // Wizard ID. Likely must be unique. Used as registry key name as well.
   SWizardID: string;
+
   CreateInstFunc: TCreateInstFunc;
 
 // global interfaces
@@ -104,7 +119,7 @@ var
   ActionSrv: IOTAActionServices;
 
 resourcestring
-  SMsgPropsNotInited = 'Wizard props not assigned, set SWizardName, SWizardID and CreateInstFunc variables';
+  SMsgPropsNotInited = 'Wizard props not assigned. SWizardName, SWizardID and CreateInstFunc variables must be assigned.';
   SMsgUnsupportedIDE = 'Necessary IDE service not found';
   SMsgRegKeyFail = 'Cannot open/create registry key ';
   SMsgErrorRegistering = 'Error registering expert %s.'#13#10'%s';
@@ -187,8 +202,6 @@ end;
 {$REGION 'TBaseWizard'}
 
 constructor TBaseWizard.Create(Options: TWizardOptions);
-var
-  Timer: TTimer;
 begin
   {$IFDEF DEBUG}
   Log('TBaseWizard.Create');
@@ -208,24 +221,18 @@ begin
   if optUseDelayed in Options then
   begin
     // timer to wait for IDE to load completely
-    Timer := TTimer.Create(nil);
-    Timer.Interval := 300;
-    Timer.OnTimer := TimerTimer;
-    Timer.Enabled := True;
+    FTimer := TTimer.Create(nil);
+    FTimer.Interval := 300;
+    FTimer.OnTimer := TimerTimer;
+    FTimer.Enabled := True;
   end
   else
-  begin
-    Startup;
-    FStarted := True;
-  end;
-end;
-
-procedure TBaseWizard.Cleanup;
-begin
+    DoStartup;
 end;
 
 destructor TBaseWizard.Destroy;
 begin
+  FreeAndNil(FTimer);  // first switch the timer off to avoid ticking after destruction
   {$IFDEF DEBUG}
   Log('TBaseWizard.Destroy');
   {$ENDIF}
@@ -234,13 +241,26 @@ begin
   inherited;
 end;
 
+procedure TBaseWizard.DoStartup;
+begin
+  if FWasStartup then Exit;
+  {$IFDEF DEBUG}
+  Log('TBaseWizard.DoStartup');
+  {$ENDIF}
+  Startup;
+  FWasStartup := True;
+  FWasCleanup := False;
+end;
+
 procedure TBaseWizard.DoCleanup;
 begin
   if FWasCleanup then Exit;
-  Cleanup;
   {$IFDEF DEBUG}
   Log('TBaseWizard.DoCleanup');
   {$ENDIF}
+  Cleanup;
+  FWasCleanup := True;
+  FWasStartup := False;
 end;
 
 procedure TBaseWizard.Log(const msg: string);
@@ -275,11 +295,11 @@ end;
 // toolbars are read from registry...)
 procedure TBaseWizard.TimerTimer(Sender: TObject);
 begin
+  if FTimer = nil then Exit; // check if destructor has been executed
   if CheckReady then
   begin
-    Sender.Free;  // switch the timer off
-    Startup;      // launch
-    FStarted := True;
+    FreeAndNil(FTimer);  // switch the timer off
+    DoStartup;           // launch
   end;
 end;
 

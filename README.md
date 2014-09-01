@@ -6,7 +6,7 @@ Features
 
 * Supports both BPL and DLL projects (**DLL not tested yet**)
 * Initializes several basic RAD Studio interfaces
-* Logs output to file `%TEMP%\%wizardname%.log` (in DEBUG configuration) and standard debug channel (view messages in RAD Studio's Message tool window or with DbgView application)
+* Logs output to file `%TEMP%\%wizardname%.log` (in DEBUG configuration) and to standard debug channel (view the messages in RAD Studio's Message tool window or with DbgView application)
 * Optional config via registry (default path is `HKCU\Software\Embarcadero\BDS\%BDSver%\Experts\%SWizardID%`)
 * Optional delayed init - gives RAD Studio some time to startup
 * Optional forms support
@@ -48,6 +48,36 @@ Probably you have already used this way with "include hack". It is quite tricky 
 **All you've got to do is name all the units of your wizard in unique way.**
 
 Of course, there are many flavors to do it but I advice using "namespaces" just like RAD Studio does (`System.SysUtils`, `Vcl.Forms` etc). So if your wizard is, say, a tetris integrated into IDE, use prefix `TetWiz` for all the used units: `TetWiz.MainWiz`, `TetWiz.FormSettings`, `TetWiz.FormMain` etc. Thus you'll create a completely autonomous package which won't conflict with another one (maybe yours too!), even if it would have `MainWiz` and `FormSettings` units as well.
+
+Wizard architecture
+-------------------
+
+IDE behaves with wizards quite randomly. It could unload them, load again, destroy the object or just ignore it (destructor won't be executed). So some principles should be followed to avoid errors. BaseWizard class has four points of applying custom init/fin actions and all of them have their own use cases.
+
+* **constructor Create(Options: TWizardOptions)**
+
+Constructor is mainly used for defining wizard options in descendants but fits for creating stuff too. Keep in mind that objects you create here could bypass freeing in destructor. **NEVER** try to create here something that will be freed in Cleanup! Follow the rule: what is created in constructor should be freed in destructor.
+
+* **destructor Destroy**
+
+Destructor seem to seldom be called though this happens sometimes. Place only non-critical freeings here. All valuable actions (setting saving etc) must be performed in Cleanup. Freeing of custom objects in descendants SHOULD be performed AFTER calling inherited destructor as it calls Cleanup before actual freeing:
+
+```pascal
+destructor TMyWizard.Destroy;
+begin
+  inherited;
+  FreeAndNil(...);
+end;
+```
+
+* **procedure Startup**
+
+The main point for create/init things. Perform any init actions but remember that Startup/Cleanup pair could be executed ANY NUMBER of times during a single IDE run time and a wizard's lifecycle. Follow the rule: what is created in Startup should be freed in Cleanup. Use `TBaseWizard.WasStartup` to check if Startup was already executed.
+
+* **procedure Cleanup**
+
+Method is called when the wizard is about to be unloaded. You must implement all main closes/frees/etc here because destructor is seldom called for the wizard! Use `TBaseWizard.WasCleanup` to check if Cleanup was already executed.
+
 
 Sample
 ------
