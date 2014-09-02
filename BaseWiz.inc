@@ -1,15 +1,17 @@
 (*******************************************************************************
-  Base expert/wizard for RAD studio class
+  Base expert/wizard class for Delphi/RAD Studio.
     Config via registry, delayed init, forms support
   Defines:
     BW_Pack - the project is BPL package
-      or
+      = or =
     BW_Lib  - the project is DLL expert
     BW_UseForms - support forms (there's some trick with forms from DLL/BPL)
     BW_UseMenuItem - an item with caption %SWizardMenuItem% will be added to
       Help menu. Pressing it will launch wizard's Execute method. This is not
       adjustable, if you want custom placement in menu, you should add it via
       INSrv.MainMenu
+  Compatibility:
+    Delphi 7 and upper
   Usage:
     See README and demo project
 
@@ -26,6 +28,9 @@ uses Windows, SysUtils, Registry,
      ExtCtrls, // for TTimer
      ToolsApi;
 
+// Don't know the precise versions, let it be 2006
+{$IF CompilerVersion >= 18}{$DEFINE Support_Strict}{$IFEND}
+
 type
   TWizardOption = (
     optUseConfig,    // use fixed registry key for config
@@ -35,7 +40,7 @@ type
 
   // TNotifierObject has stub implementations for the necessary but unused IOTANotifer methods
   TBaseWizard = class(TNotifierObject, IOTAWizard {$IFDEF BW_UseMenuItem}, IOTAMenuWizard{$ENDIF})
-  strict private
+  {$IFDEF Support_Strict}strict{$ENDIF} private
     FTimer: TTimer;
     FConfigKey: TRegistry;    // config storage
     FWasStartup: Boolean;     // flag showing that DoStartup was executed
@@ -199,7 +204,7 @@ begin
 end;
 {$ENDIF}
 
-{$REGION 'TBaseWizard'}
+// *** TBaseWizard ***
 
 constructor TBaseWizard.Create(Options: TWizardOptions);
 begin
@@ -254,7 +259,7 @@ end;
 
 procedure TBaseWizard.DoCleanup;
 begin
-  if FWasCleanup then Exit;
+  if FWasCleanup or not FWasStartup then Exit;
   {$IFDEF DEBUG}
   Log('TBaseWizard.DoCleanup');
   {$ENDIF}
@@ -326,8 +331,6 @@ begin
   Result := SWizardMenuItem;
 end;
 {$ENDIF}
-
-{$ENDREGION}
 
 initialization
 
